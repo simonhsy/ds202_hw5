@@ -1,0 +1,82 @@
+---
+title: "ds202_hw5"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+1.The code below downloads the data for Ames only and saves a local copy to your machine. The first time you run this code, make sure you have a good internet connection and enough space on your machine (~50 MB). If the local copy exists, re-knitting the file will load the (binary) file from disk and be much faster.
+```{r}
+library(readr)
+if (file.exists("alcohol.rds")) {
+  data <- readRDS("alcohol.rds")
+} else {
+  url <- "https://xdaiisu.github.io/ds202materials/data/ames.csv"
+  data <- readr::read_csv(url)
+  saveRDS(data, file="alcohol.rds")
+}
+```
+
+2.Data cleaning:
+·extract geographic latitude and longitude from the variable Store Location
+·check variable types. Pick five variables that need to be converted to a different type and fix those.
+·extract year, month and day from the variable Date
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+dataClean <- readRDS("alcohol.rds")
+dataClean <- suppressWarnings(separate(dataClean, "Store Location", c("Address", "Coordinates"), sep = "\\("))
+dataClean <- separate(dataClean, "Coordinates", c("latitude", "longitude"), sep = ",")
+dataClean<- separate(dataClean, "longitude", c("longitude", "empty"), sep = "\\)")
+dataClean <- dataClean %>% select(-c("empty"))
+dataClean$latitude <- as.numeric(dataClean$latitude)
+dataClean$longitude <- as.numeric(dataClean$longitude)
+dataClean$`Vendor Number` <- as.numeric(dataClean$`Vendor Number`)
+dataClean$`Store Name` <- as.factor(dataClean$`Store Name`)
+dataClean$`Category Name` <- as.factor(dataClean$`Category Name`)
+dataClean <- dataClean %>% mutate("Real Date" = Date) %>% separate("Date", c("Month", "Day", "Year"), sep="/")
+```
+
+3.First overview:
+·Plot a scatterplot of lat and long of store locations.
+
+```{r}
+data <- dataClean
+suppressWarnings(ggplot(data, aes(x = latitude, y = longitude)) + geom_point())
+```
+
+·Provide a visual breakdown of the liquor category (by Category Name). Include volume sold in the breakdown.
+
+```{r}
+visual <- suppressWarnings(data %>% group_by(`Category Name`) %>% summarise(total = (sum(`Volume Sold (Liters)`)/1000)))
+visual <- visual[order(-visual$total), ]
+visual <- head(visual, 20)
+ggplot(visual, aes(x= reorder(`Category Name`, -total), y=total)) + geom_col() + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("liquor category (by Category Name)") + ylab("volume sold in the breakdown") + ggtitle("Visual breakdown of the liquor category (by Category Name)")
+```
+
+
+4.Find the daily sales liquor sales in Ames in 2018. Summarize number of sales, volume of liquor sold and amount of money spent. Plot volume sold by day (use a scatterplot of volume by day and facet by month). Describe any patterns. Find the dates for ISU football home games in Fall 2018. Can you see a pattern?
+
+```{r}
+#Summarize number of sales, volume of liquor sold and amount of money spent.
+sales2018 <- data %>% filter(Year == 2018)
+sum2018 <- sales2018 %>% summarise(numSales = sum(sales2018$`Bottles Sold`), volLiquor = sum(sales2018$`Volume Sold (Gallons)`), amtMoney = sum(sales2018$`Sale (Dollars)`))
+sum2018
+
+#Plot volume sold by day (use a scatterplot of volume by day and facet by month).
+sales2018$Day <- as.numeric(sales2018$Day)
+ggplot(sales2018, aes(x=Day, y=`Volume Sold (Gallons)`)) + geom_point() + facet_wrap(~Month) + scale_x_continuous(breaks=seq(0,30,6)) + xlab("Days of Months") + ylab("Volume sold") + ggtitle("Liquor volume sold by day")
+```
+
+Describe any patterns:
+There are 3-4 peeks in each graph. We can tell that it should be the weekends people buy liquor.The data seems missing alot in October. 
+
+Find the dates for ISU football home games in Fall 2018:
+9/1/18, 9/15/18, 9/22/18, 10/13/18, 10/27/18, 11/10/18, 11/24/18, 12/1/18
+
+The football game mainly held in September to December. But we are missing the data in September and most October. The pattern cannot be told this time.
